@@ -61,7 +61,7 @@ impl eframe::App for MyApp {
                 );
 
             ui.add_space(16.);
-            
+
 
             egui::warn_if_debug_build(ui);
 

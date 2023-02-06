@@ -1,12 +1,15 @@
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+use serialport;
+
+
 pub struct MyApp {
     // Example stuff:
     label: String,
-
+    tty : u8,
+    baud : u32,
+    data: u32,
+    parity: String,
+    stop: String,
     // this how you opt-out of serialization of a member
-    #[serde(skip)]
     value: f32,
 }
 
@@ -15,6 +18,11 @@ impl Default for MyApp {
         Self {
             // Example stuff:
             label: "Hello World!".to_owned(),
+            tty: 1,
+            baud : 115_200,
+            data : 8,
+            parity: "None".to_string(),
+            stop: "1".to_string(),
             value: 2.7,
         }
     }
@@ -23,89 +31,92 @@ impl Default for MyApp {
 impl MyApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
         Default::default()
     }
 }
 
 impl eframe::App for MyApp {
-    /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
+
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let Self { label, value } = self;
-
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-            });
-        });
-
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            ui.heading("Side Panel");
-
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(label);
-            });
-
-            ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                *value += 1.0;
-            }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to(
-                        "eframe",
-                        "https://github.com/emilk/egui/tree/master/crates/eframe",
-                    );
-                    ui.label(".");
-                });
-            });
-        });
+        let Self { label, tty, baud, data, parity, stop, value } = self;
+        let baud_rate = [110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 128000, 256000];
+        let data_bits = [5,6,7,8];
+        let _parity = ["None", "Odd", "Even", "Mark", "Space"];
+        let stop_bits = ["1","1.5", "2"];
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
-            ));
-            egui::warn_if_debug_build(ui);
-        });
+            if ui.button("Start").clicked() {
+                _frame.close();
+            }
+            ui.add_space(16.);
 
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally choose either panels OR windows.");
-            });
-        }
+            //TODO: Create empty string and label to set label to the left or make PR.
+            egui::ComboBox::from_label("Choose UART")
+                .selected_text(format!("/dev/ttyUSB{:?}", self.tty))
+                .show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.tty, 1, "/dev/ttyUSB0");
+                ui.selectable_value(&mut self.tty, 2, "/dev/ttyUSB1");
+                ui.selectable_value(&mut self.tty, 3, "/dev/ttyUSB2");
+                }
+                );
+
+            ui.add_space(16.);
+            egui::ComboBox::from_label("Baud rate")
+                .selected_text(self.baud.to_string())
+                .show_ui(ui, |ui| {
+                for b in baud_rate {
+                    ui.selectable_value(&mut self.baud, b, b.to_string());
+                }
+                }
+                );
+
+            ui.add_space(16.);
+            egui::ComboBox::from_label("Data bits")
+                .selected_text(self.data.to_string())
+                .show_ui(ui, |ui| {
+                for d in data_bits {
+                    ui.selectable_value(&mut self.data, d, d.to_string());
+                }
+                }
+                );
+
+            ui.add_space(16.);
+            egui::ComboBox::from_label("Parity")
+                .selected_text(&self.parity)
+                .show_ui(ui, |ui| {
+                for p in _parity {
+                    ui.selectable_value(&mut self.parity, p.to_string(), p.to_string());
+                }
+                }
+                );
+
+            ui.add_space(16.);
+            egui::ComboBox::from_label("Stop bits")
+                .selected_text(&self.stop)
+                .show_ui(ui, |ui| {
+                for s in stop_bits {
+                    ui.selectable_value(&mut self.stop, s.to_string(), s.to_string());
+                }
+                }
+                );
+
+            ui.add_space(16.);
+
+            if ui.button("Quit").clicked() {
+                _frame.close();
+            }
+            ui.add_space(16.);
+            
+            egui::warn_if_debug_build(ui);
+
+            //println!("Selected: {}/{}/{}/{}/{}",self.tty, self.baud, self.data, self.parity, self.stop);
+        });
     }
 }

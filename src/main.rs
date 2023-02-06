@@ -9,7 +9,14 @@ fn main() {
     // Log to stdout (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
 
-    let native_options = eframe::NativeOptions::default();
+    let mut native_options = eframe::NativeOptions::default();
+    native_options.maximized = false;
+    native_options.decorated = true;
+    native_options.drag_and_drop_support = false;
+    native_options.initial_window_pos = Option::from(egui::pos2(350.0, 350.0));
+    native_options.initial_window_size = Option::from(egui::vec2(400.0, 330.0));
+    native_options.resizable = false;
+
     eframe::run_native(
         "rser2tcp",
         native_options,

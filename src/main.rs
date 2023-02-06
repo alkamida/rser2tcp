@@ -14,7 +14,7 @@ fn main() {
     native_options.decorated = true;
     native_options.drag_and_drop_support = false;
     native_options.initial_window_pos = Option::from(egui::pos2(350.0, 350.0));
-    native_options.initial_window_size = Option::from(egui::vec2(400.0, 330.0));
+    native_options.initial_window_size = Option::from(egui::vec2(450.0, 300.0));
     native_options.resizable = false;
 
     eframe::run_native(
